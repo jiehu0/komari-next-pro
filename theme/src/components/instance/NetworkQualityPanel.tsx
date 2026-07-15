@@ -85,8 +85,17 @@ export default function NetworkQualityPanel({ uuid }: { uuid: string }) {
 
   const toggleTask = (id: number) => {
     const key = String(id);
-    setHiddenLines((prev) => ({ ...prev, [key]: !prev[key] }));
+    setHiddenLines((prev) => {
+      const allVisible = tasks.every((task) => !prev[String(task.id)]);
+      if (!allVisible) return { ...prev, [key]: !prev[key] };
+
+      const next: Record<string, boolean> = {};
+      tasks.forEach((task) => { next[String(task.id)] = task.id !== id; });
+      return next;
+    });
   };
+
+  const allTasksVisible = tasks.every((task) => !hiddenLines[String(task.id)]);
 
   return (
     <div className="ds-nq-page ds-nq-page-redesign">
@@ -125,7 +134,7 @@ export default function NetworkQualityPanel({ uuid }: { uuid: string }) {
                     className={`ds-nq-route-block ds-nq-route-block-${tone} ${hidden ? 'is-hidden' : 'is-active'}`}
                     onClick={() => toggleTask(task.id)}
                     type="button"
-                    title={hidden ? '点击显示该线路' : '点击隐藏该线路'}
+                    title={allTasksVisible ? '点击仅显示该线路' : hidden ? '点击显示该线路' : '点击隐藏该线路'}
                   >
                     <div className="ds-nq-route-block-top">
                       <span className="ds-nq-route-dot" style={{ background: colors[idx % colors.length] }} />
