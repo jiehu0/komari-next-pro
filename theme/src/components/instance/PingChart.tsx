@@ -11,7 +11,7 @@ import {
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { cutPeakValues, interpolateNullsLinear } from "@/utils/RecordHelper";
 import Tips from "@/components/ui/tips";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -162,10 +162,9 @@ const PingChart = ({
     return config;
   }, [tasks]);
 
-  const toggleAllLines = () => {
-    const allHidden = tasks.every((task) => hiddenLines[String(task.id)]);
+  const showAllLines = () => {
     const next: Record<string, boolean> = {};
-    tasks.forEach((task) => { next[String(task.id)] = !allHidden; });
+    tasks.forEach((task) => { next[String(task.id)] = false; });
     setHiddenLines(next);
   };
 
@@ -258,12 +257,8 @@ const PingChart = ({
                 </Tips>
               </label>
             </div>
-            <Button variant="outline" size="sm" onClick={toggleAllLines} className="flex items-center gap-2">
-              {tasks.every((task) => hiddenLines[String(task.id)]) ? (
-                <><Eye size={16} />{t("chart.showAll")}</>
-              ) : (
-                <><EyeOff size={16} />{t("chart.hideAll")}</>
-              )}
+            <Button variant="outline" size="sm" onClick={showAllLines} className="flex items-center gap-2">
+              <Eye size={16} />{t("chart.showAll")}
             </Button>
           </div>
         </>
