@@ -132,11 +132,12 @@ const PingChart = ({
       full = interpolateNullsLinear(full, tasks.map((t) => String(t.id)), {
         maxGapMultiplier: 6,
         minCapMs: 2 * 60_000,
-        maxCapMs: 30 * 60_000,
+        // Long-range RPC responses are downsampled, so their normal interval can exceed 30 minutes.
+        maxCapMs: hours * 60 * 60_000,
       });
     }
     return full;
-  }, [midData, cutPeak, tasks]);
+  }, [midData, cutPeak, tasks, hours]);
 
   const timeFormatter = (value: any, index: number) => {
     if (!chartData.length) return "";
