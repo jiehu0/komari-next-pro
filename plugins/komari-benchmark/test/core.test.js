@@ -17,7 +17,7 @@ test("builds one pinned command for each benchmark", () => {
   assert.ok(core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_URL_RESULT.csv") < core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_PAGE="));
   assert.doesNotMatch(core.benchmarkCommand("geekbench5", "manual"), /KMB_CPU_GUARD_USAGE/);
   assert.match(core.benchmarkCommand("geekbench5", "schedule"), /KMB_CPU_GUARD_USAGE/);
-  assert.match(core.benchmarkCommand("geekbench5", "schedule"), /CPU usage .* >= 50%/);
+  assert.match(core.benchmarkCommand("geekbench5", "schedule"), /CPU usage .* >= 60%/);
 });
 
 test("parses independent sysbench CPU and memory results", () => {
@@ -80,7 +80,7 @@ test("preserves a Geekbench result URL when score parsing is blocked", () => {
 test("preserves a scheduled Geekbench CPU guard skip", () => {
   const result = core.parseBenchmarkOutput([
     "KMB_TEST=geekbench5", "KMB_CPU_GUARD_USAGE=63.25", "KMB_STATUS=skipped",
-    "KMB_ERROR=scheduled Geekbench 5 skipped: CPU usage 63.25% >= 50%",
+    "KMB_ERROR=scheduled Geekbench 5 skipped: CPU usage 63.25% >= 60%",
   ].join("\n"), 0);
   assert.equal(result.status, "skipped");
   assert.equal(result.meta.cpu_guard_usage, 63.25);
@@ -121,8 +121,8 @@ test("normalizes per-test schedule configuration", () => {
     geekbench5: { frequency: "bad", time: "99:99", weekday: 9 },
   } });
   assert.deepEqual(config.schedules.fio, { enabled: false, frequency: "monthly", time: "23:15", weekday: 0, day: 28 });
-  assert.equal(config.schedules.geekbench5.frequency, "weekly");
-  assert.equal(config.schedules.geekbench5.time, "04:30");
+  assert.equal(config.schedules.geekbench5.frequency, "daily");
+  assert.equal(config.schedules.geekbench5.time, "03:00");
   assert.equal(config.schedules.geekbench5.weekday, 6);
 });
 

@@ -5,7 +5,7 @@ const SCHEDULER_TICK = "* * * * *";
 const TASK_TIMEOUT_MS = 20 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
 const TEST_KEYS = ["sysbench", "memory", "fio", "geekbench5"];
-const GEEKBENCH5_CPU_THRESHOLD = 50;
+const GEEKBENCH5_CPU_THRESHOLD = 60;
 
 const DEFAULT_CONFIG = Object.freeze({
   version: 1,
@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = Object.freeze({
     sysbench: { enabled: true, frequency: "daily", time: "03:30", weekday: 0, day: 1 },
     memory: { enabled: true, frequency: "daily", time: "03:45", weekday: 0, day: 1 },
     fio: { enabled: true, frequency: "weekly", time: "04:00", weekday: 0, day: 1 },
-    geekbench5: { enabled: true, frequency: "weekly", time: "04:30", weekday: 0, day: 1 },
+    geekbench5: { enabled: true, frequency: "daily", time: "03:00", weekday: 0, day: 1 },
   },
 });
 

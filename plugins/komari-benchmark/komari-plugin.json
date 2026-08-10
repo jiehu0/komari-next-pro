@@ -9,7 +9,7 @@
     "en-US": "Collects Geekbench 5, Sysbench CPU, memory, and fio disk benchmarks through Komari Agent and retains 30 days of history."
   },
   "author": "jiehu0",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "url": "https://github.com/jiehu0/komari-next-pro",
   "komari": ">=1.4.2",
   "entry": "script.js",
