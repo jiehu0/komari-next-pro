@@ -42,6 +42,8 @@ interface ManagedThemeSettings {
   logoImageUrl?: string;
   footerBrandLine?: string;
   showAssetCalculatorButton?: boolean;
+  showMoodSystem?: boolean;
+  showLevelSystem?: boolean;
   streamUnlock?: Partial<StreamUnlockConfig>;
   statusCardsVisibility?: Partial<StatusCardsVisibility>;
 }
@@ -102,6 +104,8 @@ function normalizeManagedThemeSettings(input: any): ManagedThemeSettings {
   if (typeof input.logoImageUrl === 'string') result.logoImageUrl = input.logoImageUrl;
   if (typeof input.footerBrandLine === 'string') result.footerBrandLine = input.footerBrandLine;
   if (typeof input.showAssetCalculatorButton === 'boolean') result.showAssetCalculatorButton = input.showAssetCalculatorButton;
+  if (typeof input.showMoodSystem === 'boolean') result.showMoodSystem = input.showMoodSystem;
+  if (typeof input.showLevelSystem === 'boolean') result.showLevelSystem = input.showLevelSystem;
   if (input.streamUnlock && typeof input.streamUnlock === 'object') {
     result.streamUnlock = {
       ...DEFAULT_STREAM_UNLOCK_CONFIG,

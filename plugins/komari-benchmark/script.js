@@ -7,21 +7,48 @@ const core = require("./lib/core");
 
 const HISTORY_FILE = path.join(__storageDir__, "history.json");
 const HISTORY_TEMP_FILE = path.join(__storageDir__, "history.json.tmp");
+const CONFIG_FILE = path.join(__storageDir__, "config.json");
+const CONFIG_TEMP_FILE = path.join(__storageDir__, "config.json.tmp");
+const SCHEDULE_STATE_FILE = path.join(__storageDir__, "schedule-state.json");
+const SCHEDULE_STATE_TEMP_FILE = path.join(__storageDir__, "schedule-state.json.tmp");
 
 let currentRun = null;
 let unloading = false;
 
+function readJSON(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch (_) { return fallback; }
+}
+
+function writeJSON(file, tempFile, value) {
+  fs.writeFileSync(tempFile, JSON.stringify(value), "utf8");
+  fs.renameSync(tempFile, file);
+}
+
 function readHistory() {
-  try {
-    return core.normalizeHistory(JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8")));
-  } catch (_) {
-    return core.emptyHistory();
-  }
+  return core.normalizeHistory(readJSON(HISTORY_FILE, core.emptyHistory()));
 }
 
 function writeHistory(history) {
-  fs.writeFileSync(HISTORY_TEMP_FILE, JSON.stringify(history), "utf8");
-  fs.renameSync(HISTORY_TEMP_FILE, HISTORY_FILE);
+  writeJSON(HISTORY_FILE, HISTORY_TEMP_FILE, history);
+}
+
+function readConfig() {
+  return core.normalizeConfig(readJSON(CONFIG_FILE, core.DEFAULT_CONFIG));
+}
+
+function writeConfig(config) {
+  const normalized = core.normalizeConfig(config);
+  writeJSON(CONFIG_FILE, CONFIG_TEMP_FILE, normalized);
+  return normalized;
+}
+
+function readScheduleState() {
+  const value = readJSON(SCHEDULE_STATE_FILE, {});
+  return value && typeof value === "object" ? value : {};
+}
+
+function writeScheduleState(state) {
+  writeJSON(SCHEDULE_STATE_FILE, SCHEDULE_STATE_TEMP_FILE, state);
 }
 
 function setJSONHeaders(res) {
@@ -90,17 +117,16 @@ async function waitForTask(taskId, expectedCount) {
   return latest;
 }
 
-function saveTaskResults(targets, rawResults, taskId, source) {
+function saveTaskResults(test, targets, rawResults, taskId, source) {
   const byClient = new Map();
   rawResults.map(taskResultFields).forEach((result) => byClient.set(result.client, result));
   let history = readHistory();
   const savedAt = new Date();
-
   for (const client of targets) {
     const result = byClient.get(client.uuid);
     const record = result
-      ? core.parseBenchmarkOutput(result.output, result.exitCode, result.finishedAt)
-      : { time: savedAt.toISOString(), status: "timeout", error: "agent result timed out", meta: {} };
+      ? core.parseBenchmarkOutput(result.output, result.exitCode, result.finishedAt, test)
+      : { test, time: savedAt.toISOString(), status: "timeout", error: "agent result timed out", meta: {} };
     record.task_id = taskId;
     record.source = source;
     history = core.mergeHistory(history, client.uuid, record, savedAt);
@@ -108,89 +134,84 @@ function saveTaskResults(targets, rawResults, taskId, source) {
   writeHistory(history);
 }
 
-async function startBenchmarks(requestedUUIDs, source) {
+async function runOneTest(test, targets, source) {
+  if (unloading) return;
+  const dispatched = await server.call("admin:exec", {
+    command: core.BENCHMARK_COMMANDS[test],
+    clients: targets.map((client) => client.uuid),
+  });
+  const taskId = String(core.property(dispatched, "task_id", "TaskId", "TaskID") || "");
+  if (!taskId) throw new Error("Komari did not return a task id");
+  currentRun.active_test = test;
+  currentRun.task_id = taskId;
+  const results = await waitForTask(taskId, targets.length);
+  if (!unloading) saveTaskResults(test, targets, results, taskId, source);
+  currentRun.completed_tests.push(test);
+}
+
+async function startBenchmarks(tests, requestedUUIDs, source) {
   if (currentRun) {
     const error = new Error("a benchmark run is already active");
     error.code = "busy";
     throw error;
   }
-
+  const selectedTests = [...new Set(tests)].filter((test) => core.TEST_KEYS.includes(test));
+  if (!selectedTests.length) throw new Error("no valid benchmark tests");
   const clients = await listClients();
   const requested = Array.isArray(requestedUUIDs) ? new Set(requestedUUIDs) : null;
   const targets = requested ? clients.filter((client) => requested.has(client.uuid)) : clients;
   if (!targets.length) throw new Error("no matching clients");
 
-  const dispatched = await server.call("admin:exec", {
-    command: core.BENCHMARK_COMMAND,
-    clients: targets.map((client) => client.uuid),
-  });
-  const taskId = String(core.property(dispatched, "task_id", "TaskId", "TaskID") || "");
-  if (!taskId) throw new Error("Komari did not return a task id");
-
   currentRun = {
-    task_id: taskId,
     source,
     started_at: new Date().toISOString(),
     clients: targets.map((client) => client.uuid),
+    tests: selectedTests,
+    completed_tests: [],
+    active_test: null,
+    task_id: null,
   };
-
+  const accepted = { ...currentRun };
   void (async () => {
     try {
-      const results = await waitForTask(taskId, targets.length);
-      if (!unloading) saveTaskResults(targets, results, taskId, source);
+      for (const test of selectedTests) await runOneTest(test, targets, source);
     } catch (error) {
-      console.error(`[benchmark] task ${taskId} failed: ${error.message}`);
+      console.error(`[benchmark] run failed: ${error.message}`);
     } finally {
       currentRun = null;
     }
   })();
-
-  return currentRun;
+  return accepted;
 }
 
 async function historyRoute(req, res) {
   const uuid = String(req.query.uuid || "");
-  if (!validUUID(uuid)) {
-    sendJSON(res, 400, { status: "error", message: "invalid uuid" });
-    return;
-  }
-
+  if (!validUUID(uuid)) return sendJSON(res, 400, { status: "error", message: "invalid uuid" });
   try {
     const client = await getClient(uuid);
-    if (!client.uuid || (client.hidden && !hasAdminRole(req.context))) {
-      sendJSON(res, 404, { status: "error", message: "not found" });
-      return;
-    }
+    if (!client.uuid || (client.hidden && !hasAdminRole(req.context))) return sendJSON(res, 404, { status: "error", message: "not found" });
     const history = readHistory();
-    sendJSON(res, 200, {
-      status: "success",
-      data: {
-        version: history.version,
-        uuid,
-        schedule: core.SCHEDULE,
-        retention_days: core.RETENTION_DAYS,
-        updated_at: history.updated_at,
-        records: core.historyForNode(history, uuid),
-      },
-    });
-  } catch (error) {
+    sendJSON(res, 200, { status: "success", data: {
+      version: history.version,
+      uuid,
+      retention_days: core.RETENTION_DAYS,
+      updated_at: history.updated_at,
+      records: core.historyForNode(history, uuid),
+    } });
+  } catch (_) {
     sendJSON(res, 404, { status: "error", message: "not found" });
   }
 }
 
 async function runRoute(req, res) {
-  if (!hasAdminRole(req.context)) {
-    sendJSON(res, 403, { status: "error", message: "admin required" });
-    return;
-  }
+  if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
   const uuid = String(req.query.uuid || "");
-  const requested = uuid ? [uuid] : null;
-  if (uuid && !validUUID(uuid)) {
-    sendJSON(res, 400, { status: "error", message: "invalid uuid" });
-    return;
-  }
+  if (uuid && !validUUID(uuid)) return sendJSON(res, 400, { status: "error", message: "invalid uuid" });
+  const requestedTest = String(req.query.test || "all");
+  const tests = requestedTest === "all" ? core.TEST_KEYS : [requestedTest];
+  if (requestedTest !== "all" && !core.TEST_KEYS.includes(requestedTest)) return sendJSON(res, 400, { status: "error", message: "invalid test" });
   try {
-    const run = await startBenchmarks(requested, "manual");
+    const run = await startBenchmarks(tests, uuid ? [uuid] : null, "manual");
     sendJSON(res, 202, { status: "accepted", data: run });
   } catch (error) {
     sendJSON(res, error.code === "busy" ? 409 : 400, { status: "error", message: error.message });
@@ -198,24 +219,58 @@ async function runRoute(req, res) {
 }
 
 function statusRoute(req, res) {
-  if (!hasAdminRole(req.context)) {
-    sendJSON(res, 403, { status: "error", message: "admin required" });
-    return;
-  }
+  if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
   sendJSON(res, 200, { status: "success", data: { running: Boolean(currentRun), run: currentRun } });
+}
+
+function configRoute(req, res) {
+  if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
+  const offsetMinutes = -new Date().getTimezoneOffset();
+  const offsetSign = offsetMinutes >= 0 ? "+" : "-";
+  const offsetHours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, "0");
+  const offsetRemainder = String(Math.abs(offsetMinutes) % 60).padStart(2, "0");
+  sendJSON(res, 200, { status: "success", data: {
+    config: readConfig(),
+    timezone: `UTC${offsetSign}${offsetHours}:${offsetRemainder}`,
+  } });
+}
+
+function updateConfigRoute(req, res) {
+  if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
+  try {
+    const value = JSON.parse(String(req.body || "{}"));
+    const config = writeConfig(value);
+    sendJSON(res, 200, { status: "success", data: { config } });
+  } catch (_) {
+    sendJSON(res, 400, { status: "error", message: "invalid JSON body" });
+  }
+}
+
+function schedulerTick() {
+  if (currentRun || unloading) return;
+  const now = new Date();
+  const state = readScheduleState();
+  const tests = core.dueTests(readConfig(), state, now);
+  if (!tests.length) return;
+  void startBenchmarks(tests, null, "schedule").then(() => {
+    const scheduledAt = now.toISOString();
+    for (const test of tests) state[test] = scheduledAt;
+    writeScheduleState(state);
+  }).catch((error) => {
+    if (error.code !== "busy") console.error(`[benchmark] scheduled run failed: ${error.message}`);
+  });
 }
 
 function load() {
   unloading = false;
+  writeConfig(readConfig());
   server.route("GET", "/api/plugin/komari-benchmark/history", historyRoute);
   server.route("POST", "/api/plugin/komari-benchmark/run", runRoute);
   server.route("GET", "/api/plugin/komari-benchmark/status", statusRoute);
-  server.cron(core.SCHEDULE, () => {
-    void startBenchmarks(null, "schedule").catch((error) => {
-      if (error.code !== "busy") console.error(`[benchmark] scheduled run failed: ${error.message}`);
-    });
-  });
-  console.log(`[benchmark] loaded; schedule=${core.SCHEDULE}; retention=${core.RETENTION_DAYS}d`);
+  server.route("GET", "/api/plugin/komari-benchmark/config", configRoute);
+  server.route("POST", "/api/plugin/komari-benchmark/config", updateConfigRoute);
+  server.cron(core.SCHEDULER_TICK, schedulerTick);
+  console.log(`[benchmark] loaded; scheduler=${core.SCHEDULER_TICK}; retention=${core.RETENTION_DAYS}d`);
 }
 
 function unload() {

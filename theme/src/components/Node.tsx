@@ -25,6 +25,8 @@ import { formatBytes } from "@/utils/unitHelper";
 
 import Flag from "./Flag";
 import { usePingBlocks } from "@/hooks/usePingBlocks";
+import { useTheme } from "@/contexts/ThemeContext";
+import NodeMoodStatus from "./NodeMoodStatus";
 
 // ── Helpers ──
 
@@ -216,28 +218,34 @@ type NodeCardVisibility = {
   latency: boolean; packetLoss: boolean;
   downloadSpeed: boolean; uploadSpeed: boolean; downloadTotal: boolean; uploadTotal: boolean;
   expire: boolean; uptime: boolean; ipBadges: boolean; osIcon: boolean; regionFlag: boolean;
+  mood: boolean; level: boolean;
 };
 const DEFAULT_NODE_CARD_VISIBILITY: NodeCardVisibility = {
   cpu: true, memory: true, disk: true, monthlyTraffic: true,
   latency: true, packetLoss: true,
   downloadSpeed: true, uploadSpeed: true, downloadTotal: true, uploadTotal: true,
   expire: true, uptime: true, ipBadges: true, osIcon: true, regionFlag: true,
+  mood: true, level: true,
 };
 const VISIBILITY_FIELDS: { key: keyof NodeCardVisibility; label: string }[] = [
   {key:'cpu', label:'CPU'}, {key:'memory', label:'内存'}, {key:'disk', label:'磁盘'}, {key:'monthlyTraffic', label:'月度流量'},
   {key:'latency', label:'延迟'}, {key:'packetLoss', label:'丢包'},
   {key:'downloadSpeed', label:'下载速度'}, {key:'uploadSpeed', label:'上传速度'}, {key:'downloadTotal', label:'下载流量'}, {key:'uploadTotal', label:'上传流量'},
   {key:'expire', label:'到期'}, {key:'uptime', label:'运行时间'}, {key:'ipBadges', label:'IPv4/IPv6'}, {key:'osIcon', label:'系统图标'}, {key:'regionFlag', label:'地区旗帜'},
+  {key:'mood', label:'心情表情'}, {key:'level', label:'等级徽章'},
 ];
 
 const Node = ({ basic, live, online }: NodeProps) => {
   const [t] = useTranslation();
+  const { managedThemeSettings } = useTheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeProConfig, setThemeProConfig] = useState<any>(null);
   const [draftVisibility, setDraftVisibility] = useState<NodeCardVisibility>(DEFAULT_NODE_CARD_VISIBILITY);
   const [publicCap, setPublicCap] = useState<{ hasIPv4?: boolean; hasIPv6?: boolean } | null>(null);
   const pingBlocks = usePingBlocks(basic.uuid);
+  const showMoodSystem = managedThemeSettings.showMoodSystem !== false;
+  const showLevelSystem = managedThemeSettings.showLevelSystem !== false;
   useEffect(() => { fetch("/api/me").then(r => r.ok ? r.json() : null).then(me => setIsLoggedIn(!!me?.logged_in)).catch(() => setIsLoggedIn(false)); }, []);
   useEffect(() => {
     if (!settingsOpen) return;
@@ -301,10 +309,21 @@ const Node = ({ basic, live, online }: NodeProps) => {
       <div className="ds-hdr2">
         <div className="ds-hdr2-left">
           {visibility.regionFlag ? <span className="ds-hdr-flag"><Flag flag={basic.region} /></span> : null}
-          <Link href={`/instance/${basic.uuid}`} className="ds-hdr-name" title={basic.name}>
-            {ell(basic.name, 16)}
-          </Link>
-          
+          <div className="ds-hdr-main">
+            <Link href={`/instance/${basic.uuid}`} className="ds-hdr-name" title={basic.name}>
+              {ell(basic.name, 16)}
+            </Link>
+            <NodeMoodStatus
+              uuid={basic.uuid}
+              online={online}
+              uptime={uptime}
+              memoryTotal={memTotal}
+              currentCpu={cpuUsage}
+              currentMemory={memPct}
+              showMood={showMoodSystem && visibility.mood}
+              showLevel={showLevelSystem && visibility.level}
+            />
+          </div>
         </div>
         <div className="ds-hdr2-right">
           {visibility.osIcon && getDtOsIconUrl(basic.os) && (
@@ -332,8 +351,13 @@ const Node = ({ basic, live, online }: NodeProps) => {
             <div className="ds-card-settings-grid">
               {VISIBILITY_FIELDS.map((f) => (
                 <label key={f.key} className="ds-card-settings-option">
-                  <input type="checkbox" checked={draftVisibility[f.key]} onChange={(e)=>setDraftVisibility(v=>({...v,[f.key]:e.target.checked}))} />
-                  <span>{f.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={draftVisibility[f.key]}
+                    disabled={(f.key === 'mood' && !showMoodSystem) || (f.key === 'level' && !showLevelSystem)}
+                    onChange={(e)=>setDraftVisibility(v=>({...v,[f.key]:e.target.checked}))}
+                  />
+                  <span>{f.label}{((f.key === 'mood' && !showMoodSystem) || (f.key === 'level' && !showLevelSystem)) ? '（全局已关）' : ''}</span>
                 </label>
               ))}
             </div>

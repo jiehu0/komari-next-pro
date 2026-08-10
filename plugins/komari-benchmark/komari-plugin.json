@@ -5,11 +5,11 @@
   },
   "short": "komari-benchmark",
   "description": {
-    "zh-CN": "通过 Komari Agent 定时采集 Sysbench CPU、内存和 fio 磁盘性能，并保留 30 天历史。",
-    "en-US": "Collects Sysbench CPU, memory, and fio disk benchmarks through Komari Agent and retains 30 days of history."
+    "zh-CN": "通过 Komari Agent 定时采集 Geekbench 5、Sysbench CPU、内存和 fio 磁盘性能，并保留 30 天历史。",
+    "en-US": "Collects Geekbench 5, Sysbench CPU, memory, and fio disk benchmarks through Komari Agent and retains 30 days of history."
   },
   "author": "jiehu0",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "url": "https://github.com/jiehu0/komari-next-pro",
   "komari": ">=1.4.2",
   "entry": "script.js",

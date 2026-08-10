@@ -22,8 +22,7 @@ Recommended deployment approach:
 ## Environment variables
 
 - `KOMARI_BASE` — Komari base URL
-- `KOMARI_USER` — Komari admin username
-- `KOMARI_PASS` — Komari admin password
+- `KOMARI_API_KEY` — Komari API key used for the terminal WebSocket
 - `PORT` — service port
 
 ## Start example
@@ -32,14 +31,13 @@ Recommended deployment approach:
 cd unlock-probe
 PORT=19116 \
 KOMARI_BASE=http://127.0.0.1:25774 \
-KOMARI_USER=admin \
-KOMARI_PASS=change-me \
+KOMARI_API_KEY=replace-with-a-long-random-api-key \
 node server.mjs
 ```
 
 ## Security notes
 
-- Do not hardcode real production passwords.
+- Do not hardcode the production API key.
 - Do not expose privileged write endpoints without authentication.
 - Prefer fixed-script execution over arbitrary command passthrough.
 - Review public result masking behavior before internet exposure.
