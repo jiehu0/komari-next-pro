@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cpu, MemoryStick, HardDrive, Wifi, ArrowUp, ArrowDown, Activity, Globe2, ShieldCheck } from "lucide-react";
+import { Cpu, MemoryStick, HardDrive, Wifi, ArrowUp, ArrowDown, Activity, Globe2, ShieldCheck, Gauge, ArrowLeft } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useLiveData } from "@/contexts/LiveDataContext";
 import { useTranslation } from "react-i18next";
 import type { Record } from "@/types/LiveData";
@@ -15,6 +16,7 @@ import PingChart from "./PingChart";
 import NetworkQualityPanel from "./NetworkQualityPanel";
 import StatusCharts from "./StatusCharts";
 import IpInfoPanel from "./IpInfoPanel";
+import BenchmarkPanel from "./BenchmarkPanel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 
@@ -61,7 +63,7 @@ export default function InstancePage({ uuid }: InstancePageProps) {
   const [recent, setRecent] = useState<Record[]>([]);
   const { nodeList } = useNodeList();
   const length = 30 * 5;
-  const [chartView, setChartView] = useState<"status" | "ip" | "quality">("status");
+  const [chartView, setChartView] = useState<"status" | "ip" | "quality" | "benchmark">("status");
   
   // Find the node
   const node = nodeList?.find((n) => n.uuid === uuid);
@@ -106,6 +108,13 @@ export default function InstancePage({ uuid }: InstancePageProps) {
 
   return (
     <div className="ds-inst flex flex-col items-center gap-6 p-4 w-full max-w-[1400px] mx-auto">
+      <div className="ds-inst-actions w-full">
+        <Link href="/" className="ds-inst-backbtn">
+          <ArrowLeft className="h-4 w-4" />
+          <span>{t("common.backHome", { defaultValue: "返回主页" })}</span>
+        </Link>
+      </div>
+
       {/* Header Section */}
       <div className="ds-inst-header w-full">
         <div className="ds-inst-top">
@@ -141,6 +150,7 @@ export default function InstancePage({ uuid }: InstancePageProps) {
               <SegmentedControlItem value="status" className="capitalize ds-top-tab-item"><Activity size={15} /><span>{t("status", "状态")}</span></SegmentedControlItem>
               <SegmentedControlItem value="ip" className="capitalize ds-top-tab-item"><Globe2 size={15} /><span>{t("ipInfo", "IP信息")}</span></SegmentedControlItem>
               <SegmentedControlItem value="quality" className="capitalize ds-top-tab-item"><ShieldCheck size={15} /><span>{t("netQuality", "网络质量")}</span></SegmentedControlItem>
+              <SegmentedControlItem value="benchmark" className="capitalize ds-top-tab-item"><Gauge size={15} /><span>基准测试</span></SegmentedControlItem>
             </SegmentedControl>
           </div>
         </div>
@@ -255,10 +265,16 @@ export default function InstancePage({ uuid }: InstancePageProps) {
               <IpInfoPanel node={node} isOnline={isOnline} />
             </div>
           </div>
-        ) : (
+        ) : chartView === "quality" ? (
           <div className="ds-inst-section">
             <div className="ds-inst-section-body">
               <NetworkQualityPanel uuid={uuid ?? ""} />
+            </div>
+          </div>
+        ) : (
+          <div className="ds-inst-section">
+            <div className="ds-inst-section-body">
+              <BenchmarkPanel uuid={uuid ?? ""} />
             </div>
           </div>
         )}

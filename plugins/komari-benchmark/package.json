@@ -1,0 +1,9 @@
+{
+  "name": "komari-benchmark-plugin",
+  "private": true,
+  "version": "0.1.2",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test"
+  }
+}

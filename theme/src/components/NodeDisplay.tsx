@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
-import { Search, Grid3X3, Table2, X } from "lucide-react";
+import { Search, Grid3X3, Table2, X, MapPinned } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { NodeBasicInfo } from "@/contexts/NodeListContext";
 import type { LiveData } from "../types/LiveData";
 import { NodeGrid } from "./Node";
+import Flag from "./Flag";
 const NodeTable = React.lazy(() => import("./NodeTable"));
-import { isRegionMatch } from "@/utils/regionHelper";
+import { getRegionDisplayName, isRegionMatch } from "@/utils/regionHelper";
 import "./NodeDisplay.css";
 
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ interface NodeDisplayProps {
 }
 
 const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
-  const [t] = useTranslation();
+  const [t, i18n] = useTranslation();
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>(
     "nodeViewMode",
     "grid"
@@ -44,6 +45,10 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
   const [selectedGroup, setSelectedGroup] = useLocalStorage<string>(
     "nodeSelectedGroup",
     "all"
+  );
+  const [groupByRegion, setGroupByRegion] = useLocalStorage<boolean>(
+    "nodeGroupByRegion",
+    false
   );
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +122,32 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
     });
   }, [nodes, searchTerm, liveData, selectedGroup]);
 
+  const regionSections = useMemo(() => {
+    const sections = new Map<string, NodeBasicInfo[]>();
+
+    filteredNodes.forEach((node) => {
+      const region = node.region?.trim() || "__unknown__";
+      const section = sections.get(region);
+      if (section) {
+        section.push(node);
+      } else {
+        sections.set(region, [node]);
+      }
+    });
+
+    return Array.from(sections, ([region, sectionNodes]) => ({
+      region,
+      nodes: sectionNodes,
+      name:
+        region === "__unknown__"
+          ? t("common.unknownRegion", { defaultValue: "未设置地区" })
+          : getRegionDisplayName(
+              region,
+              i18n.language.toLowerCase().startsWith("zh") ? "zh" : "en"
+            ),
+    }));
+  }, [filteredNodes, i18n.language, t]);
+
   return (
     <div className="w-full space-y-6">
       <div className="ds-home-toolbar ds-home-toolbar-quad">
@@ -182,25 +213,37 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
         </div>
 
         <div className="ds-home-toolbar-cell ds-home-toolbar-cell-group">
-          {showGroupSelector ? (
-            <div className="ds-home-toolbar-group-shell">
-              <div className="ds-home-toolbar-label">{t("common.group", { defaultValue: "分组" })}</div>
-              <div className="ds-home-toolbar-tabs-wrap">
-                <Tabs value={selectedGroup} onValueChange={setSelectedGroup} className="w-auto">
-                  <TabsList className="ds-home-toolbar-tabslist">
-                    <TabsTrigger value="all" className="ds-home-toolbar-tabtrigger">
-                      {getGroupLabel("all", t)}
-                    </TabsTrigger>
-                    {groups.map((group) => (
-                      <TabsTrigger key={getGroupLabel(group, t)} value={getGroupLabel(group, t)} className="ds-home-toolbar-tabtrigger">
-                        {getGroupLabel(group, t)}
+          <div className="ds-home-toolbar-region-controls">
+            {showGroupSelector ? (
+              <div className="ds-home-toolbar-group-shell">
+                <div className="ds-home-toolbar-label">{t("common.group", { defaultValue: "分组" })}</div>
+                <div className="ds-home-toolbar-tabs-wrap">
+                  <Tabs value={selectedGroup} onValueChange={setSelectedGroup} className="w-auto">
+                    <TabsList className="ds-home-toolbar-tabslist">
+                      <TabsTrigger value="all" className="ds-home-toolbar-tabtrigger">
+                        {getGroupLabel("all", t)}
                       </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                      {groups.map((group) => (
+                        <TabsTrigger key={getGroupLabel(group, t)} value={getGroupLabel(group, t)} className="ds-home-toolbar-tabtrigger">
+                          {getGroupLabel(group, t)}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn("ds-home-toolbar-regionbtn", groupByRegion && "is-active")}
+              aria-pressed={groupByRegion}
+              onClick={() => setGroupByRegion((enabled) => !enabled)}
+            >
+              <MapPinned className="h-4 w-4" />
+              <span>{t("common.groupByRegion", { defaultValue: "按地区分区" })}</span>
+            </Button>
+          </div>
         </div>
 
         <div className="ds-home-toolbar-cell ds-home-toolbar-cell-view">
@@ -245,7 +288,37 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
         </div>
       ) : (
         <>
-          {viewMode === "grid" ? (
+          {groupByRegion ? (
+            <div className="ds-region-sections">
+              {regionSections.map((section) => (
+                <section className="ds-region-section" key={section.region}>
+                  <div className="ds-region-section-header">
+                    {section.region === "__unknown__" ? (
+                      <MapPinned className="ds-region-section-icon" aria-hidden="true" />
+                    ) : (
+                      <Flag flag={section.region} />
+                    )}
+                    <h2 className="ds-region-section-title">{section.name}</h2>
+                    <span className="ds-region-section-count">
+                      {t("nodeCard.regionNodeCount", {
+                        count: section.nodes.length,
+                        defaultValue: `${section.nodes.length} 台`,
+                      })}
+                    </span>
+                  </div>
+                  {viewMode === "grid" ? (
+                    <NodeGrid nodes={section.nodes} liveData={liveData} />
+                  ) : (
+                    <Suspense
+                      fallback={<div className="p-4 text-center">{t("common.loading_table", { defaultValue: "正在加载表格..." })}</div>}
+                    >
+                      <NodeTable nodes={section.nodes} liveData={liveData} />
+                    </Suspense>
+                  )}
+                </section>
+              ))}
+            </div>
+          ) : viewMode === "grid" ? (
             <NodeGrid nodes={filteredNodes} liveData={liveData} />
           ) : (
             <Suspense
