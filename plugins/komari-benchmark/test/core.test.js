@@ -15,6 +15,9 @@ test("builds one pinned command for each benchmark", () => {
   assert.match(core.BENCHMARK_COMMANDS.geekbench5, /32037e55c3dc8f360fe16b7fbb188d31387ea75980e48d8cf028330e3239c404/);
   assert.match(core.BENCHMARK_COMMANDS.geekbench5, /GB_URL_RESULT\.csv/);
   assert.ok(core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_URL_RESULT.csv") < core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_PAGE="));
+  assert.doesNotMatch(core.benchmarkCommand("geekbench5", "manual"), /KMB_CPU_GUARD_USAGE/);
+  assert.match(core.benchmarkCommand("geekbench5", "schedule"), /KMB_CPU_GUARD_USAGE/);
+  assert.match(core.benchmarkCommand("geekbench5", "schedule"), /CPU usage .* >= 50%/);
 });
 
 test("parses independent sysbench CPU and memory results", () => {
@@ -72,6 +75,16 @@ test("preserves a Geekbench result URL when score parsing is blocked", () => {
   ].join("\n"), 0);
   assert.equal(result.status, "error");
   assert.equal(result.result_url, "https://browser.geekbench.com/v5/cpu/24522614");
+});
+
+test("preserves a scheduled Geekbench CPU guard skip", () => {
+  const result = core.parseBenchmarkOutput([
+    "KMB_TEST=geekbench5", "KMB_CPU_GUARD_USAGE=63.25", "KMB_STATUS=skipped",
+    "KMB_ERROR=scheduled Geekbench 5 skipped: CPU usage 63.25% >= 50%",
+  ].join("\n"), 0);
+  assert.equal(result.status, "skipped");
+  assert.equal(result.meta.cpu_guard_usage, 63.25);
+  assert.match(result.error, /63\.25%/);
 });
 
 test("preserves an agent execution error", () => {

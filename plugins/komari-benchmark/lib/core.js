@@ -5,6 +5,7 @@ const SCHEDULER_TICK = "* * * * *";
 const TASK_TIMEOUT_MS = 20 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
 const TEST_KEYS = ["sysbench", "memory", "fio", "geekbench5"];
+const GEEKBENCH5_CPU_THRESHOLD = 50;
 
 const DEFAULT_CONFIG = Object.freeze({
   version: 1,
@@ -115,7 +116,32 @@ run_fio 512k 512K || exit 0
 run_fio 1m 1M || exit 0
 echo "KMB_STATUS=ok"`);
 
-const GEEKBENCH5_COMMAND = commandFor("geekbench5", String.raw`ARCH=$(uname -m)
+const GEEKBENCH5_CPU_GUARD = String.raw`read_cpu_sample() {
+  awk '/^cpu / { total=0; for (i=2; i<=NF; i++) total += $i; idle=$5+$6; printf "%.0f %.0f\n", total, idle; exit }' /proc/stat
+}
+set -- $(read_cpu_sample)
+CPU_TOTAL_1=$1
+CPU_IDLE_1=$2
+sleep 5
+set -- $(read_cpu_sample)
+CPU_TOTAL_2=$1
+CPU_IDLE_2=$2
+CPU_TOTAL_DELTA=$((CPU_TOTAL_2 - CPU_TOTAL_1))
+CPU_IDLE_DELTA=$((CPU_IDLE_2 - CPU_IDLE_1))
+if [ "$CPU_TOTAL_DELTA" -le 0 ]; then
+  echo "KMB_STATUS=skipped"
+  echo "KMB_ERROR=scheduled Geekbench 5 skipped: CPU usage could not be measured"
+  exit 0
+fi
+CPU_USAGE=$(awk -v total="$CPU_TOTAL_DELTA" -v idle="$CPU_IDLE_DELTA" 'BEGIN { printf "%.2f", 100 * (total - idle) / total }')
+echo "KMB_CPU_GUARD_USAGE=$CPU_USAGE"
+if awk -v usage="$CPU_USAGE" -v threshold="${GEEKBENCH5_CPU_THRESHOLD}" 'BEGIN { exit !(usage >= threshold) }'; then
+  echo "KMB_STATUS=skipped"
+  echo "KMB_ERROR=scheduled Geekbench 5 skipped: CPU usage ${"$"}{CPU_USAGE}% >= ${GEEKBENCH5_CPU_THRESHOLD}%"
+  exit 0
+fi`;
+
+const GEEKBENCH5_BODY = String.raw`ARCH=$(uname -m)
 case "$ARCH" in
   x86_64|amd64)
     GB_URL="https://cdn.geekbench.com/Geekbench-5.5.1-Linux.tar.gz"
@@ -216,7 +242,10 @@ esac
 echo "KMB_GB5_SINGLE=$GB_SINGLE"
 echo "KMB_GB5_MULTI=$GB_MULTI"
 echo "KMB_GB5_URL=$GB_URL_RESULT"
-echo "KMB_STATUS=ok"`);
+echo "KMB_STATUS=ok"`;
+
+const GEEKBENCH5_COMMAND = commandFor("geekbench5", GEEKBENCH5_BODY);
+const GEEKBENCH5_SCHEDULED_COMMAND = commandFor("geekbench5", `${GEEKBENCH5_CPU_GUARD}\n${GEEKBENCH5_BODY}`);
 
 const BENCHMARK_COMMANDS = Object.freeze({
   sysbench: SYSBENCH_COMMAND,
@@ -224,6 +253,11 @@ const BENCHMARK_COMMANDS = Object.freeze({
   fio: FIO_COMMAND,
   geekbench5: GEEKBENCH5_COMMAND,
 });
+
+function benchmarkCommand(test, source) {
+  if (test === "geekbench5" && source === "schedule") return GEEKBENCH5_SCHEDULED_COMMAND;
+  return BENCHMARK_COMMANDS[test];
+}
 
 function numberValue(value) {
   const parsed = Number(value);
@@ -301,6 +335,7 @@ function parseBenchmarkOutput(output, exitCode, fallbackTime, expectedTest) {
       sysbench_version: extractMarker(output, "SYSBENCH_VERSION"),
       fio_version: extractMarker(output, "FIO_VERSION"),
       geekbench_version: extractMarker(output, "GB5_VERSION"),
+      cpu_guard_usage: numberValue(extractMarker(output, "CPU_GUARD_USAGE")),
     },
   };
   const resultUrl = extractMarker(output, "GB5_URL");
@@ -432,11 +467,13 @@ function dueTests(configValue, stateValue, now) {
 module.exports = {
   BENCHMARK_COMMANDS,
   DEFAULT_CONFIG,
+  GEEKBENCH5_CPU_THRESHOLD,
   POLL_INTERVAL_MS,
   RETENTION_DAYS,
   SCHEDULER_TICK,
   TASK_TIMEOUT_MS,
   TEST_KEYS,
+  benchmarkCommand,
   clientInfo,
   dueTests,
   emptyHistory,

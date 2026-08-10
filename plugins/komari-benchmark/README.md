@@ -18,6 +18,8 @@ Each test has its own persisted schedule. The default schedules use the Komari s
 
 Schedules can be disabled or changed to daily, weekly, or monthly from the theme's benchmark panel while signed in as an administrator. Nodes run in parallel; different test types run sequentially.
 
+Scheduled Geekbench 5 runs sample each node's CPU usage for five seconds immediately before the benchmark. Nodes at or above 50% CPU are recorded as skipped and are not retried until the next scheduled day. Manual Geekbench runs bypass this guard.
+
 ## Requirements
 
 - Komari Agent remote control enabled

@@ -137,7 +137,7 @@ function saveTaskResults(test, targets, rawResults, taskId, source) {
 async function runOneTest(test, targets, source) {
   if (unloading) return;
   const dispatched = await server.call("admin:exec", {
-    command: core.BENCHMARK_COMMANDS[test],
+    command: core.benchmarkCommand(test, source),
     clients: targets.map((client) => client.uuid),
   });
   const taskId = String(core.property(dispatched, "task_id", "TaskId", "TaskID") || "");
