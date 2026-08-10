@@ -13,6 +13,8 @@ test("builds one pinned command for each benchmark", () => {
   for (const name of core.TEST_KEYS) assert.match(core.BENCHMARK_COMMANDS[name], new RegExp(`TEST_NAME="${name}"`));
   assert.match(core.BENCHMARK_COMMANDS.geekbench5, /Geekbench-5\.5\.1-Linux\.tar\.gz/);
   assert.match(core.BENCHMARK_COMMANDS.geekbench5, /32037e55c3dc8f360fe16b7fbb188d31387ea75980e48d8cf028330e3239c404/);
+  assert.match(core.BENCHMARK_COMMANDS.geekbench5, /GB_URL_RESULT\.csv/);
+  assert.ok(core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_URL_RESULT.csv") < core.BENCHMARK_COMMANDS.geekbench5.indexOf("GB_PAGE="));
 });
 
 test("parses independent sysbench CPU and memory results", () => {

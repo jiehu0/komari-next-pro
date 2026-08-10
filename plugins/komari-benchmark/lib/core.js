@@ -176,21 +176,35 @@ if [ -z "$GB_URL_RESULT" ]; then
 fi
 GB_SINGLE=""
 GB_MULTI=""
-GB_PAGE=""
+GB_CSV=""
 ATTEMPT=1
-while [ "$ATTEMPT" -le 4 ]; do
-  sleep 5
+while [ "$ATTEMPT" -le 6 ]; do
   if command -v curl >/dev/null 2>&1; then
-    GB_PAGE=$(curl -A 'Mozilla/5.0' -fsL --connect-timeout 20 "$GB_URL_RESULT" 2>/dev/null || true)
+    GB_CSV=$(curl -fsL --connect-timeout 10 --max-time 20 "$GB_URL_RESULT.csv" 2>/dev/null || true)
   else
-    GB_PAGE=$(wget -qO- --user-agent='Mozilla/5.0' "$GB_URL_RESULT" 2>/dev/null || true)
+    GB_CSV=$(wget -qO- --timeout=20 --tries=1 "$GB_URL_RESULT.csv" 2>/dev/null || true)
   fi
-  GB_SCORES=$(printf '%s\n' "$GB_PAGE" | grep -Eo "<div class=['\"]score['\"]>[[:space:]]*[0-9,]+[[:space:]]*</div>" | sed -E 's/<[^>]+>//g; s/[[:space:],]//g')
-  GB_SINGLE=$(printf '%s\n' "$GB_SCORES" | sed -n '1p')
-  GB_MULTI=$(printf '%s\n' "$GB_SCORES" | sed -n '2p')
-  if [ -n "$GB_SINGLE" ] && [ -n "$GB_MULTI" ]; then break; fi
+  GB_SINGLE=$(printf '%s\n' "$GB_CSV" | awk -F',' '$1 == "Single-Core" { gsub(/[^0-9]/, "", $2); print $2; exit }')
+  GB_MULTI=$(printf '%s\n' "$GB_CSV" | awk -F',' '$1 == "Multi-Core" { gsub(/[^0-9]/, "", $2); print $2; exit }')
+  case "$GB_SINGLE:$GB_MULTI" in
+    *[!0-9:]*|:|*:) ;;
+    *) break ;;
+  esac
+  sleep $((ATTEMPT * 5))
   ATTEMPT=$((ATTEMPT + 1))
 done
+case "$GB_SINGLE:$GB_MULTI" in
+  *[!0-9:]*|:|*:)
+    if command -v curl >/dev/null 2>&1; then
+      GB_PAGE=$(curl -A 'Mozilla/5.0' -fsL --connect-timeout 10 --max-time 20 "$GB_URL_RESULT" 2>/dev/null || true)
+    else
+      GB_PAGE=$(wget -qO- --timeout=20 --tries=1 --user-agent='Mozilla/5.0' "$GB_URL_RESULT" 2>/dev/null || true)
+    fi
+    GB_SCORES=$(printf '%s\n' "$GB_PAGE" | grep -Eo "<div class=['\"]score['\"]>[[:space:]]*[0-9,]+[[:space:]]*</div>" | sed -E 's/<[^>]+>//g; s/[[:space:],]//g')
+    GB_SINGLE=$(printf '%s\n' "$GB_SCORES" | sed -n '1p')
+    GB_MULTI=$(printf '%s\n' "$GB_SCORES" | sed -n '2p')
+    ;;
+esac
 case "$GB_SINGLE:$GB_MULTI" in
   *[!0-9:]*|:|*:)
     echo "KMB_STATUS=error"
