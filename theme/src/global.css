@@ -1185,6 +1185,11 @@ body, * {
 :is(.dark) .ds-nq-side-card:hover,:is(.dark) .ds-nq-trend-card:hover{box-shadow:0 16px 40px rgba(0,0,0,0.45)}
 .ds-nq-side-card-head,.ds-nq-trend-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:0 0 auto;padding:14px 16px 8px;border-bottom:none}
 .ds-nq-side-card-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:950;color:var(--ds-text)}
+.ds-nq-side-card-actions{display:flex;align-items:center;gap:6px}
+.ds-nq-restore-order{display:inline-flex;align-items:center;justify-content:center;gap:3px;height:24px;padding:0 7px;border:1px solid rgba(148,163,184,.2);border-radius:8px;background:rgba(255,255,255,.52);color:var(--ds-muted);font-size:9px;font-weight:800;white-space:nowrap;transition:color .16s ease,background .16s ease,border-color .16s ease}
+:is(.dark) .ds-nq-restore-order{background:rgba(15,23,42,.34)}
+.ds-nq-restore-order:hover{border-color:rgba(59,130,246,.25);background:rgba(59,130,246,.1);color:var(--ds-text)}
+.ds-nq-restore-order:disabled{cursor:wait;opacity:.5}
 .ds-nq-reorder-status{font-size:10px;font-weight:800;color:var(--ds-muted);white-space:nowrap}
 .ds-nq-side-card-body,.ds-nq-trend-card-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:10px 16px 14px}
 .ds-nq-side-scroll{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;height:100%;overflow-y:auto;overflow-x:hidden;padding-right:6px}

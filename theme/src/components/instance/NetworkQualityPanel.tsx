@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Radar, Activity, Wifi, ShieldCheck, Route, GripVertical } from "lucide-react";
+import { Radar, Activity, Wifi, ShieldCheck, Route, GripVertical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useRPC2Call } from "@/contexts/RPC2Context";
 import PingChart from "./PingChart";
@@ -243,6 +243,28 @@ export default function NetworkQualityPanel({ uuid }: { uuid: string }) {
     }
   };
 
+  const handleRestoreDefault = async () => {
+    if (!canReorder || reordering) return;
+
+    const previousTasks = tasks;
+    const nextTasks = [...tasks].sort((a, b) => a.id - b.id);
+    setTasks(nextTasks);
+    setReordering(true);
+
+    try {
+      const allTasks = await call<undefined, PingTask[]>("admin:getAllPingTasks");
+      const sortedIds = [...allTasks].sort((a, b) => a.id - b.id).map((task) => task.id);
+      const order = Object.fromEntries(sortedIds.map((id, index) => [String(id), index]));
+      await call<Record<string, number>, null>("admin:orderPingTask", order);
+      toast.success("已恢复默认排序");
+    } catch (err: any) {
+      setTasks(previousTasks);
+      toast.error(`恢复默认排序失败：${err?.message || "未知错误"}`);
+    } finally {
+      setReordering(false);
+    }
+  };
+
   return (
     <div className="ds-nq-page ds-nq-page-redesign">
       <div className="ds-nq-overview-grid ds-nq-overview-grid-4">
@@ -268,7 +290,22 @@ export default function NetworkQualityPanel({ uuid }: { uuid: string }) {
         <section className="ds-nq-side-card">
           <header className="ds-nq-side-card-head">
             <div className="ds-nq-side-card-title"><Route size={16} /> 延迟监控</div>
-            {canReorder ? <span className="ds-nq-reorder-status">{reordering ? "保存中…" : "拖拽排序"}</span> : null}
+            {canReorder ? (
+              <div className="ds-nq-side-card-actions">
+                <button
+                  className="ds-nq-restore-order"
+                  type="button"
+                  disabled={reordering}
+                  onClick={handleRestoreDefault}
+                  aria-label="恢复默认排序"
+                  title="按任务创建顺序恢复默认排序"
+                >
+                  <RotateCcw size={12} />
+                  <span>恢复默认</span>
+                </button>
+                <span className="ds-nq-reorder-status">{reordering ? "保存中…" : "拖拽排序"}</span>
+              </div>
+            ) : null}
           </header>
           <div className="ds-nq-side-card-body">
             <div className="ds-nq-side-scroll">
