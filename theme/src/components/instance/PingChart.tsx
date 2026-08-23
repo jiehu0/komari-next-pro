@@ -49,10 +49,12 @@ const viewOptions = [
 
 const PingChart = ({
   uuid,
+  taskOrder,
   externalHiddenLines,
   onHiddenLinesChange,
 }: {
   uuid: string;
+  taskOrder?: number[];
   externalHiddenLines?: Record<string, boolean>;
   onHiddenLinesChange?: (next: Record<string, boolean>) => void;
 }) => {
@@ -68,6 +70,14 @@ const PingChart = ({
   const [internalHiddenLines, setInternalHiddenLines] = useState<Record<string, boolean>>({});
   const hiddenLines = externalHiddenLines ?? internalHiddenLines;
   const setHiddenLines = onHiddenLinesChange ?? setInternalHiddenLines;
+  const orderedTasks = useMemo(() => {
+    if (!taskOrder?.length) return tasks;
+    const orderIndex = new Map(taskOrder.map((id, index) => [id, index]));
+    return [...tasks].sort((a, b) =>
+      (orderIndex.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+      (orderIndex.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+    );
+  }, [tasks, taskOrder]);
 
   useEffect(() => {
     const selected = viewOptions.find((v) => v.key === view);
@@ -99,7 +109,7 @@ const PingChart = ({
   const midData = useMemo(() => {
     const data = remoteData || [];
     if (!data.length) return [];
-    const taskIntervals = tasks.map((t) => t.interval).filter((v): v is number => typeof v === "number" && v > 0);
+    const taskIntervals = orderedTasks.map((t) => t.interval).filter((v): v is number => typeof v === "number" && v > 0);
     const fallbackIntervalSec = taskIntervals.length ? Math.min(...taskIntervals) : 60;
     const toleranceMs = Math.min(6000, Math.max(800, Math.floor(fallbackIntervalSec * 1000 * 0.25)));
     const grouped: Record<number, any> = {};
@@ -121,15 +131,15 @@ const PingChart = ({
       grouped[use][rec.task_id] = rec.value < 0 ? null : rec.value;
     }
     return Object.values(grouped).sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime()) as any[];
-  }, [remoteData, tasks]);
+  }, [remoteData, orderedTasks]);
 
   const chartData = useMemo(() => {
     let full = midData;
-    if (cutPeak && tasks.length > 0) {
-      full = cutPeakValues(midData, tasks.map((task) => String(task.id)));
+    if (cutPeak && orderedTasks.length > 0) {
+      full = cutPeakValues(midData, orderedTasks.map((task) => String(task.id)));
     }
-    if (tasks.length > 0 && full.length > 0) {
-      full = interpolateNullsLinear(full, tasks.map((t) => String(t.id)), {
+    if (orderedTasks.length > 0 && full.length > 0) {
+      full = interpolateNullsLinear(full, orderedTasks.map((t) => String(t.id)), {
         maxGapMultiplier: 6,
         minCapMs: 2 * 60_000,
         // Long-range RPC responses are downsampled, so their normal interval can exceed 30 minutes.
@@ -137,7 +147,7 @@ const PingChart = ({
       });
     }
     return full;
-  }, [midData, cutPeak, tasks, hours]);
+  }, [midData, cutPeak, orderedTasks, hours]);
 
   const timeFormatter = (value: any, index: number) => {
     if (!chartData.length) return "";
@@ -156,15 +166,15 @@ const PingChart = ({
 
   const chartConfig = useMemo(() => {
     const config: Record<string, any> = {};
-    tasks.forEach((task, idx) => {
+    orderedTasks.forEach((task, idx) => {
       config[task.id] = { label: task.name, color: colors[idx % colors.length] };
     });
     return config;
-  }, [tasks]);
+  }, [orderedTasks]);
 
   const showAllLines = () => {
     const next: Record<string, boolean> = {};
-    tasks.forEach((task) => { next[String(task.id)] = false; });
+    orderedTasks.forEach((task) => { next[String(task.id)] = false; });
     setHiddenLines(next);
   };
 
@@ -227,7 +237,7 @@ const PingChart = ({
                       formatter={(v: any) => `${Math.round(v)} ms`}
                       content={<ChartTooltipContent labelFormatter={labelFormatter} indicator="dot" />}
                     />
-                    {tasks.map((task, idx) => (
+                    {orderedTasks.map((task, idx) => (
                       <Line
                         key={task.id}
                         dataKey={String(task.id)}
