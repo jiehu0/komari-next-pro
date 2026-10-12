@@ -35,6 +35,8 @@ type BenchmarkRecord = {
 };
 
 type HistoryResponse = {
+  uuid: string;
+  enabled: boolean;
   retention_days: number;
   updated_at: string | null;
   records: BenchmarkRecord[];
@@ -95,6 +97,8 @@ export default function BenchmarkPanel({ uuid }: { uuid: string }) {
   const [timezone, setTimezone] = useState("服务器本地时间");
   const [configMessage, setConfigMessage] = useState("");
   const [configBusy, setConfigBusy] = useState(false);
+  const [nodeBusy, setNodeBusy] = useState(false);
+  const [nodeMessage, setNodeMessage] = useState("");
 
   useEffect(() => {
     fetch("/api/me", { credentials: "include" })
@@ -107,6 +111,8 @@ export default function BenchmarkPanel({ uuid }: { uuid: string }) {
     if (!uuid) return;
     const controller = new AbortController();
     setLoading(true);
+    setData(null);
+    setNodeMessage("");
     setError(null);
     fetch(`/api/plugin/komari-benchmark/history?uuid=${encodeURIComponent(uuid)}`, { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
@@ -119,6 +125,26 @@ export default function BenchmarkPanel({ uuid }: { uuid: string }) {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [uuid]);
+
+  const setNodeEnabled = async (enabled: boolean) => {
+    setNodeBusy(true);
+    setNodeMessage("");
+    try {
+      const response = await fetch(`/api/plugin/komari-benchmark/node?uuid=${encodeURIComponent(uuid)}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message || `HTTP ${response.status}`);
+      setData((current) => current && current.uuid === body.data.uuid ? { ...current, enabled: body.data.enabled } : current);
+    } catch (reason) {
+      setNodeMessage(reason instanceof Error ? reason.message : "保存失败");
+    } finally {
+      setNodeBusy(false);
+    }
+  };
 
   const loadConfig = async () => {
     setConfigBusy(true);
@@ -217,6 +243,13 @@ export default function BenchmarkPanel({ uuid }: { uuid: string }) {
         </div>
       </header>
 
+      {isAdmin && data ? <div className="ds-bench-node-setting">
+        <label className="ds-bench-schedule-enable"><input type="checkbox" checked={data.enabled !== false} disabled={nodeBusy} onChange={(event) => void setNodeEnabled(event.target.checked)} /><strong>允许此服务器执行基准测试</strong></label>
+        <span>{nodeBusy ? "保存中…" : "关闭后不再启动定时或手动测试，历史结果保留。"}</span>
+        {nodeMessage ? <span role="alert">{nodeMessage}</span> : null}
+      </div> : null}
+      {data?.enabled === false ? <p className="ds-bench-node-disabled">此服务器已暂停基准测试，以下为历史结果。</p> : null}
+
       {view === "disk" ? <div className="ds-bench-disk-controls">
         <div className="ds-bench-subtabs">{(["4k", "64k", "512k", "1m"] as BlockSize[]).map((size) => <button type="button" key={size} className={blockSize === size ? "is-active" : ""} onClick={() => setBlockSize(size)}>{size.toUpperCase()}</button>)}</div>
         <div className="ds-bench-subtabs"><button type="button" className={diskMetric === "throughput" ? "is-active" : ""} onClick={() => setDiskMetric("throughput")}>吞吐</button><button type="button" className={diskMetric === "iops" ? "is-active" : ""} onClick={() => setDiskMetric("iops")}>IOPS</button></div>
@@ -246,7 +279,7 @@ export default function BenchmarkPanel({ uuid }: { uuid: string }) {
 
       {settingsOpen ? <div className="ds-bench-settings-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="ds-bench-settings" role="dialog" aria-modal="true" aria-label="基准测试计划">
-          <header><div><h3>测试计划</h3><p>执行时间按 {timezone} 计算</p></div><button type="button" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></header>
+          <header><div><h3>全局测试计划</h3><p>仅对已允许测试的服务器生效，执行时间按 {timezone} 计算</p></div><button type="button" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></header>
           {configBusy && !config ? <div className="ds-bench-settings-loading"><Loading /></div> : null}
           {config ? <div className="ds-bench-schedule-list">{(Object.keys(testLabels) as TestKey[]).map((test) => {
             const schedule = config.schedules[test];

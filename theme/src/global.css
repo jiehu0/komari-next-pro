@@ -2385,6 +2385,9 @@ body.ds-card-settings-open .ds-card-settings-btn{pointer-events:none!important}
 }
 
 /* Instance benchmark history */
+.ds-bench-node-setting { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 18px; }
+.ds-bench-node-setting > span, .ds-bench-node-disabled { font-size: 13px; opacity: .75; }
+.ds-bench-node-disabled { padding: 0 18px; }
 .ds-bench-card {
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.06);

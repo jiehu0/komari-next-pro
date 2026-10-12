@@ -18,6 +18,8 @@ Each test has its own persisted schedule. The default schedules use the Komari s
 
 Schedules can be disabled or changed to daily, weekly, or monthly from the theme's benchmark panel while signed in as an administrator. Nodes run in parallel; different test types run sequentially.
 
+Each node's benchmark panel has an administrator-only switch to allow or pause testing for that node. Paused nodes are excluded from scheduled and manual runs; their history stays readable. The switch is persisted independently of the global schedules. Existing and newly added nodes default to allowed. Turning off a node prevents subsequent test dispatches; a test already dispatched is allowed to finish. The plugin's global enabled/disabled state is unchanged by these switches.
+
 Scheduled Geekbench 5 runs sample each node's CPU usage for five seconds immediately before the benchmark. Nodes at or above 60% CPU are recorded as skipped and are not retried until the next scheduled day. Manual Geekbench runs bypass this guard.
 
 ## Requirements
@@ -37,6 +39,7 @@ POST /api/plugin/komari-benchmark/run?uuid=<optional>&test=<optional> (admin)
 GET  /api/plugin/komari-benchmark/status                            (admin)
 GET  /api/plugin/komari-benchmark/config                            (admin)
 POST /api/plugin/komari-benchmark/config                            (admin)
+POST /api/plugin/komari-benchmark/node?uuid=<node-uuid>               (admin, JSON: {"enabled": false})
 ```
 
 `test` accepts `sysbench`, `memory`, `fio`, `geekbench5`, or `all` (the default). Omit `uuid` to test every node. Only one suite can run at a time.

@@ -438,9 +438,16 @@ function normalizeSchedule(value, fallback) {
 function normalizeConfig(value) {
   const input = value && typeof value === "object" ? value : {};
   const schedules = input.schedules && typeof input.schedules === "object" ? input.schedules : {};
-  const normalized = { version: 1, schedules: {} };
+  const normalized = { version: 1, schedules: {}, node_enabled: {} };
   for (const test of TEST_KEYS) normalized.schedules[test] = normalizeSchedule(schedules[test], DEFAULT_CONFIG.schedules[test]);
+  for (const [uuid, enabled] of Object.entries(input.node_enabled || {})) {
+    if (/^[a-zA-Z0-9-]{8,64}$/.test(uuid) && typeof enabled === "boolean") normalized.node_enabled[uuid] = enabled;
+  }
   return normalized;
+}
+
+function isNodeEnabled(config, uuid) {
+  return normalizeConfig(config).node_enabled[uuid] !== false;
 }
 
 function isScheduleDue(scheduleValue, lastRunAt, nowValue) {
@@ -479,6 +486,7 @@ module.exports = {
   emptyHistory,
   historyForNode,
   isScheduleDue,
+  isNodeEnabled,
   mergeHistory,
   normalizeConfig,
   normalizeHistory,

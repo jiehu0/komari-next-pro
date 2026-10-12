@@ -136,6 +136,9 @@ function saveTaskResults(test, targets, rawResults, taskId, source) {
 
 async function runOneTest(test, targets, source) {
   if (unloading) return;
+  const config = readConfig();
+  targets = targets.filter((client) => core.isNodeEnabled(config, client.uuid));
+  if (!targets.length) return;
   const dispatched = await server.call("admin:exec", {
     command: core.benchmarkCommand(test, source),
     clients: targets.map((client) => client.uuid),
@@ -159,8 +162,14 @@ async function startBenchmarks(tests, requestedUUIDs, source) {
   if (!selectedTests.length) throw new Error("no valid benchmark tests");
   const clients = await listClients();
   const requested = Array.isArray(requestedUUIDs) ? new Set(requestedUUIDs) : null;
-  const targets = requested ? clients.filter((client) => requested.has(client.uuid)) : clients;
-  if (!targets.length) throw new Error("no matching clients");
+  const matching = requested ? clients.filter((client) => requested.has(client.uuid)) : clients;
+  if (!matching.length) throw new Error("no matching clients");
+  const config = readConfig();
+  const targets = matching.filter((client) => core.isNodeEnabled(config, client.uuid));
+  if (!targets.length) {
+    if (source === "schedule") return { skipped: true, clients: [] };
+    throw new Error("benchmarks disabled for selected nodes");
+  }
 
   currentRun = {
     source,
@@ -194,6 +203,7 @@ async function historyRoute(req, res) {
     sendJSON(res, 200, { status: "success", data: {
       version: history.version,
       uuid,
+      enabled: core.isNodeEnabled(readConfig(), uuid),
       retention_days: core.RETENTION_DAYS,
       updated_at: history.updated_at,
       records: core.historyForNode(history, uuid),
@@ -239,11 +249,32 @@ function updateConfigRoute(req, res) {
   if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
   try {
     const value = JSON.parse(String(req.body || "{}"));
-    const config = writeConfig(value);
+    const config = writeConfig({ ...value, node_enabled: readConfig().node_enabled });
     sendJSON(res, 200, { status: "success", data: { config } });
   } catch (_) {
     sendJSON(res, 400, { status: "error", message: "invalid JSON body" });
   }
+}
+
+async function updateNodeRoute(req, res) {
+  if (!hasAdminRole(req.context)) return sendJSON(res, 403, { status: "error", message: "admin required" });
+  const uuid = String(req.query.uuid || "");
+  if (!validUUID(uuid)) return sendJSON(res, 400, { status: "error", message: "invalid uuid" });
+  let value;
+  try { value = JSON.parse(String(req.body || "{}")); } catch (_) {
+    return sendJSON(res, 400, { status: "error", message: "invalid JSON body" });
+  }
+  if (typeof value?.enabled !== "boolean") return sendJSON(res, 400, { status: "error", message: "enabled must be boolean" });
+  try {
+    const client = await getClient(uuid);
+    if (client.uuid !== uuid) return sendJSON(res, 404, { status: "error", message: "not found" });
+  } catch (_) {
+    return sendJSON(res, 404, { status: "error", message: "not found" });
+  }
+  const config = readConfig();
+  config.node_enabled[uuid] = value.enabled;
+  writeConfig(config);
+  sendJSON(res, 200, { status: "success", data: { uuid, enabled: value.enabled } });
 }
 
 function schedulerTick() {
@@ -269,6 +300,7 @@ function load() {
   server.route("GET", "/api/plugin/komari-benchmark/status", statusRoute);
   server.route("GET", "/api/plugin/komari-benchmark/config", configRoute);
   server.route("POST", "/api/plugin/komari-benchmark/config", updateConfigRoute);
+  server.route("POST", "/api/plugin/komari-benchmark/node", updateNodeRoute);
   server.cron(core.SCHEDULER_TICK, schedulerTick);
   console.log(`[benchmark] loaded; scheduler=${core.SCHEDULER_TICK}; retention=${core.RETENTION_DAYS}d`);
 }
