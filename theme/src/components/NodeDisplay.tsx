@@ -279,10 +279,11 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
         </div>
       </div>
 
-      <div className="ds-cloud-order-controls">
-        <span role="status">{cloud.error || (cloud.busy ? "保存到云端…" : cloud.state ? (cloud.admin ? "拖动手柄排序 · 云端同步" : "云端排序") : "正在同步排序…")}</span>
-        {viewMode === "table" && cloud.state ? <label><input type="checkbox" checked={cloud.state.follow} disabled={!cloud.admin || cloud.busy} onChange={e => void cloud.save("follow", e.target.checked)} /> 跟随卡片顺序</label> : null}
-      </div>
+      {viewMode === "table" && cloud.state ? (
+        <div className="ds-cloud-order-controls">
+          <label><input type="checkbox" checked={cloud.state.follow} disabled={!cloud.admin || cloud.busy} onChange={e => void cloud.save("follow", e.target.checked)} /> 跟随网格顺序</label>
+        </div>
+      ) : null}
       {/* Node Display Area */}
       {filteredNodes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 bg-muted/20 rounded-lg border border-dashed">
