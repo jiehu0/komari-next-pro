@@ -1,4 +1,4 @@
-import { SortArea, SortItem } from "./CloudSortable";
+import { SortArea, SortItem, SortHandle } from "./CloudSortable";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -342,6 +342,7 @@ const Node = ({ basic, live, online }: NodeProps) => {
               <Settings className="w-3.5 h-3.5" />
             </button>
           ) : null}
+          <SortHandle />
           <span className={`ds-hdr-dot ${online ? "on" : "off"}`} />
         </div>
       </div>
@@ -453,11 +454,11 @@ const Node = ({ basic, live, online }: NodeProps) => {
 export default Node;
 
 // ── NodeGrid ──
-type NodeGridProps = { nodes: NodeBasicInfo[]; liveData: LiveData; onOrder?: (ids: string[]) => void };
-export const NodeGrid = ({ nodes, liveData, onOrder }: NodeGridProps) => {
+type NodeGridProps = { nodes: NodeBasicInfo[]; liveData: LiveData; onOrder?: (ids: string[]) => void; sortingDisabled?: boolean };
+export const NodeGrid = ({ nodes, liveData, onOrder, sortingDisabled }: NodeGridProps) => {
   const onlineNodes = liveData?.online ?? [];
   return (
-    <SortArea ids={nodes.map(n => n.uuid)} onOrder={onOrder}><div className="ds-card-grid">
+    <SortArea ids={nodes.map(n => n.uuid)} onOrder={onOrder} disabled={sortingDisabled}><div className="ds-card-grid">
       {nodes.map((n) => (
         <SortItem key={n.uuid} id={n.uuid} enabled={Boolean(onOrder)}><Node basic={n} live={liveData?.data?.[n.uuid]} online={onlineNodes.includes(n.uuid)} /></SortItem>
       ))}

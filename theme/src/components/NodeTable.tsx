@@ -29,6 +29,7 @@ interface NodeTableProps {
   nodes: NodeBasicInfo[];
   liveData: LiveData;
   onOrder?: (ids: string[]) => void;
+  sortingDisabled?: boolean;
 }
 
 type SortField = 'name' | 'os' | 'status' | 'cpu' | 'ram' | 'disk' | 'price' | 'networkUp' | 'networkDown' | 'totalUp' | 'totalDown';
@@ -39,7 +40,7 @@ interface SortState {
   order: SortOrder;
 }
 
-const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onOrder }) => {
+const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onOrder, sortingDisabled }) => {
   const [t] = useTranslation();
   const [sortState, setSortState] = useState<SortState>({ field: null, order: 'default' });
 
@@ -47,7 +48,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onOrder }) => {
     return (event: React.MouseEvent) => {
       event.preventDefault();
       
-      if (!onOrder) return;
+      if (!onOrder || sortingDisabled) return;
       const nextOrder: SortOrder = sortState.field === field && sortState.order === 'asc' ? 'desc' : 'asc';
       const next = { field, order: nextOrder };
       setSortState(next);
@@ -138,7 +139,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onOrder }) => {
   const showPriceColumn = nodes.some(node => node.price !== 0);
 
   return (
-    <SortArea ids={nodes.map(n => n.uuid)} onOrder={onOrder}><div className="node-table-shell">
+    <SortArea rows ids={nodes.map(n => n.uuid)} onOrder={onOrder} disabled={sortingDisabled}><div className="node-table-shell">
       <div className="node-table-headerbar" />
       <div className="overflow-x-auto node-table-container">
         <Table className="node-table-modern min-w-[1094px] table-fixed">

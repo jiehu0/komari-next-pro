@@ -30,13 +30,23 @@ export function useCloudOrder() {
   }, []);
   const save = async (kind: "grid" | "table" | "follow", value: string[] | boolean) => {
     if (!state || !admin || saving.current) return;
-    saving.current = true; setBusy(true);
+    const previous = state;
+    const optimistic = { ...state };
+    if (kind === "follow") {
+      optimistic.follow = value as boolean;
+    } else {
+      const ordered = value as string[];
+      const selected = new Set(ordered);
+      let i = 0;
+      optimistic[kind] = state[kind].map(id => selected.has(id) ? ordered[i++] : id);
+    }
+    saving.current = true; setBusy(true); setState(optimistic);
     try {
       const response = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: state.revision, kind, value }) });
       const next = await response.json();
       if (!response.ok) throw new Error(next.message || "保存失败");
-      if (mounted.current) { accept(next); toast.success("排序已保存到云端"); }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "保存失败"); }
+      if (mounted.current) accept(next);
+    } catch (e) { if (mounted.current) setState(previous); toast.error(e instanceof Error ? e.message : "保存失败"); }
     finally { saving.current = false; if (mounted.current) setBusy(false); }
   };
   return { state, admin, busy, error, save };

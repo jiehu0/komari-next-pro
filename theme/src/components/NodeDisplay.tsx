@@ -57,7 +57,7 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
     const rank = new Map(activeOrder.map((id, i) => [id, i]));
     return [...nodes].sort((a, b) => (rank.get(a.uuid) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.uuid) ?? Number.MAX_SAFE_INTEGER) || a.weight - b.weight);
   }, [nodes, activeOrder]);
-  const canSort = cloud.admin && !cloud.busy && Boolean(cloud.state) && (viewMode === "grid" || !cloud.state?.follow);
+  const canSort = cloud.admin && Boolean(cloud.state) && (viewMode === "grid" || !cloud.state?.follow);
   const onOrder = canSort ? (ids: string[]) => { void cloud.save(viewMode === "grid" ? "grid" : "table", ids); } : undefined;
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -320,24 +320,24 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
                     </span>
                   </div>
                   {viewMode === "grid" ? (
-                    <NodeGrid onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
+                    <NodeGrid sortingDisabled={cloud.busy} onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
                   ) : (
                     <Suspense
                       fallback={<div className="p-4 text-center">{t("common.loading_table", { defaultValue: "正在加载表格..." })}</div>}
                     >
-                      <NodeTable onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
+                      <NodeTable sortingDisabled={cloud.busy} onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
                     </Suspense>
                   )}
                 </section>
               ))}
             </div>
           ) : viewMode === "grid" ? (
-            <NodeGrid onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
+            <NodeGrid sortingDisabled={cloud.busy} onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
           ) : (
             <Suspense
               fallback={<div className="p-4 text-center">{t("common.loading_table", { defaultValue: "正在加载表格..." })}</div>}
             >
-              <NodeTable onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
+              <NodeTable sortingDisabled={cloud.busy} onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
             </Suspense>
           )}
         </>

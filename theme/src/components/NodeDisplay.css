@@ -1135,10 +1135,30 @@
 }
 
 /* Shared ordering: dedicated handles keep links and touch scrolling usable. */
-.ds-cloud-card > .ds-cloud-grip { position:absolute; top:36px; right:7px; z-index:4; }
+.ds-hdr2-right > .ds-cloud-grip { position:static; flex-shrink:0; width:24px; height:24px; }
 .ds-cloud-grip { display:inline-flex; align-items:center; justify-content:center; width:26px; height:28px; border-radius:8px; background:rgba(148,163,184,.15); color:inherit; cursor:grab; touch-action:none; }
 .ds-cloud-grip:active { cursor:grabbing; }
 .ds-cloud-grip:focus-visible { outline:2px solid #2388c2; }
 .ds-cloud-order-controls { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:18px; font-size:13px; padding:0 10px; }
 .ds-cloud-order-controls label { display:flex; align-items:center; gap:6px; }
 .ds-cloud-card > a, .ds-cloud-card > article { height:100%; }
+
+/* Sort transforms must take precedence over the theme's hover/active rules. */
+.node-table-modern tbody tr.ds-node-row.ds-cloud-row {
+  transform:var(--cloud-transform, none) !important;
+  transition:var(--cloud-transition, none) !important;
+}
+.ds-cloud-card.is-dragging, .ds-cloud-card.is-drop-target {
+  outline:2px dashed #2388c2; outline-offset:3px; border-radius:14px;
+}
+.node-table-modern tbody tr.ds-cloud-row:is(.is-dragging,.is-drop-target) > td {
+  border-top-style:dashed; border-bottom-style:dashed;
+  border-top-color:#2388c2; border-bottom-color:#2388c2;
+}
+.node-table-modern tbody tr.ds-cloud-row:is(.is-dragging,.is-drop-target) > td:first-child { border-left:1px dashed #2388c2; }
+.node-table-modern tbody tr.ds-cloud-row:is(.is-dragging,.is-drop-target) > td:last-child { border-right:1px dashed #2388c2; }
+.ds-cloud-card.is-dragging > .ds-card2 { transform:none !important; }
+.ds-cloud-grip:disabled { cursor:wait; }
+@media (prefers-reduced-motion: reduce) {
+  .node-table-modern tbody tr.ds-node-row.ds-cloud-row, .ds-cloud-card { transition:none !important; }
+}
