@@ -1,0 +1,22 @@
+{
+  "name": {
+    "zh-CN": "主题云端排序",
+    "en-US": "Shared theme ordering"
+  },
+  "short": "komari-layout",
+  "description": {
+    "zh-CN": "管理员维护卡片和表格顺序，所有客户端共享。"
+  },
+  "author": "jiehu0",
+  "version": "0.1.0",
+  "url": "https://github.com/jiehu0/komari-next-pro",
+  "komari": ">=1.4.2",
+  "entry": "script.js",
+  "permissions": {
+    "node": true,
+    "allowSystemRPC": true,
+    "allowRoutes": true,
+    "maxHTTPBodyBytes": 65536,
+    "timeout": 30
+  }
+}

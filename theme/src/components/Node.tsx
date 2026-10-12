@@ -1,3 +1,4 @@
+import { SortArea, SortItem } from "./CloudSortable";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -452,20 +453,14 @@ const Node = ({ basic, live, online }: NodeProps) => {
 export default Node;
 
 // ── NodeGrid ──
-type NodeGridProps = { nodes: NodeBasicInfo[]; liveData: LiveData };
-export const NodeGrid = ({ nodes, liveData }: NodeGridProps) => {
+type NodeGridProps = { nodes: NodeBasicInfo[]; liveData: LiveData; onOrder?: (ids: string[]) => void };
+export const NodeGrid = ({ nodes, liveData, onOrder }: NodeGridProps) => {
   const onlineNodes = liveData?.online ?? [];
-  const sorted = [...nodes].sort((a, b) => {
-    const aOn = onlineNodes.includes(a.uuid);
-    const bOn = onlineNodes.includes(b.uuid);
-    if (aOn !== bOn) return aOn ? -1 : 1;
-    return a.weight - b.weight;
-  });
   return (
-    <div className="ds-card-grid">
-      {sorted.map((n) => (
-        <Node key={n.uuid} basic={n} live={liveData?.data?.[n.uuid]} online={onlineNodes.includes(n.uuid)} />
+    <SortArea ids={nodes.map(n => n.uuid)} onOrder={onOrder}><div className="ds-card-grid">
+      {nodes.map((n) => (
+        <SortItem key={n.uuid} id={n.uuid} enabled={Boolean(onOrder)}><Node basic={n} live={liveData?.data?.[n.uuid]} online={onlineNodes.includes(n.uuid)} /></SortItem>
       ))}
-    </div>
+    </div></SortArea>
   );
 };

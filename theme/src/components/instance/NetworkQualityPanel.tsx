@@ -189,6 +189,29 @@ export default function NetworkQualityPanel({ uuid }: { uuid: string }) {
     return () => { cancelled = true; };
   }, [uuid, call]);
 
+  // Ping task weights already live in Komari. Refresh ordering without reloading 24h records.
+  useEffect(() => {
+    if (reordering) return;
+    let cancelled = false;
+    const refresh = async () => {
+      if (document.hidden) return;
+      try {
+        const response = await fetch("/api/task/ping", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json();
+        const all: Array<{ id: number; weight: number }> = body.data;
+        if (!Array.isArray(all) || cancelled) return;
+        const sorted = [...all].sort((a, b) => (a.weight || 0) - (b.weight || 0) || a.id - b.id);
+        const rank = new Map(sorted.map((task, i) => [task.id, i]));
+        setTasks(current => [...current].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)));
+      } catch (_) { /* Keep the last server order during transient network failures. */ }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [reordering, uuid]);
+
   const stats = useMemo(() => {
     const valid = tasks.filter((t) => typeof t.avg === "number" || typeof t.latest === "number");
     const latestLatency = valid.length ? valid.reduce((s, t) => s + (typeof t.latest === "number" ? t.latest : (t.avg || 0)), 0) / valid.length : undefined;

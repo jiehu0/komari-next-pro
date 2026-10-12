@@ -1,3 +1,4 @@
+import { useCloudOrder } from "@/hooks/useCloudOrder";
 import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
 import { Search, Grid3X3, Table2, X, MapPinned } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -50,6 +51,14 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
     "nodeGroupByRegion",
     false
   );
+  const cloud = useCloudOrder();
+  const activeOrder = cloud.state ? (viewMode === "grid" || cloud.state.follow ? cloud.state.grid : cloud.state.table) : [];
+  const orderedNodes = useMemo(() => {
+    const rank = new Map(activeOrder.map((id, i) => [id, i]));
+    return [...nodes].sort((a, b) => (rank.get(a.uuid) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.uuid) ?? Number.MAX_SAFE_INTEGER) || a.weight - b.weight);
+  }, [nodes, activeOrder]);
+  const canSort = cloud.admin && !cloud.busy && Boolean(cloud.state) && (viewMode === "grid" || !cloud.state?.follow);
+  const onOrder = canSort ? (ids: string[]) => { void cloud.save(viewMode === "grid" ? "grid" : "table", ids); } : undefined;
   const searchRef = useRef<HTMLInputElement>(null);
 
   // 获取所有的分组
@@ -87,7 +96,7 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
 
   // 过滤节点
   const filteredNodes = useMemo(() => {
-    let result = nodes;
+    let result = orderedNodes;
 
     // 先按分组过滤
     if (selectedGroup !== "all") {
@@ -120,7 +129,7 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
 
       return basicMatch || regionMatch || priceMatch || statusMatch;
     });
-  }, [nodes, searchTerm, liveData, selectedGroup]);
+  }, [orderedNodes, searchTerm, liveData, selectedGroup]);
 
   const regionSections = useMemo(() => {
     const sections = new Map<string, NodeBasicInfo[]>();
@@ -270,6 +279,10 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
         </div>
       </div>
 
+      <div className="ds-cloud-order-controls">
+        <span role="status">{cloud.error || (cloud.busy ? "保存到云端…" : cloud.state ? (cloud.admin ? "拖动手柄排序 · 云端同步" : "云端排序") : "正在同步排序…")}</span>
+        {viewMode === "table" && cloud.state ? <label><input type="checkbox" checked={cloud.state.follow} disabled={!cloud.admin || cloud.busy} onChange={e => void cloud.save("follow", e.target.checked)} /> 跟随卡片顺序</label> : null}
+      </div>
       {/* Node Display Area */}
       {filteredNodes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 bg-muted/20 rounded-lg border border-dashed">
@@ -307,24 +320,24 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
                     </span>
                   </div>
                   {viewMode === "grid" ? (
-                    <NodeGrid nodes={section.nodes} liveData={liveData} />
+                    <NodeGrid onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
                   ) : (
                     <Suspense
                       fallback={<div className="p-4 text-center">{t("common.loading_table", { defaultValue: "正在加载表格..." })}</div>}
                     >
-                      <NodeTable nodes={section.nodes} liveData={liveData} />
+                      <NodeTable onOrder={onOrder} nodes={section.nodes} liveData={liveData} />
                     </Suspense>
                   )}
                 </section>
               ))}
             </div>
           ) : viewMode === "grid" ? (
-            <NodeGrid nodes={filteredNodes} liveData={liveData} />
+            <NodeGrid onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
           ) : (
             <Suspense
               fallback={<div className="p-4 text-center">{t("common.loading_table", { defaultValue: "正在加载表格..." })}</div>}
             >
-              <NodeTable nodes={filteredNodes} liveData={liveData} />
+              <NodeTable onOrder={onOrder} nodes={filteredNodes} liveData={liveData} />
             </Suspense>
           )}
         </>

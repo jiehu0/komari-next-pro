@@ -1,3 +1,4 @@
+import { SortArea, SortItem, SortHandle } from "./CloudSortable";
 import React, { useState } from "react";
 import {
   Table,
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 interface NodeTableProps {
   nodes: NodeBasicInfo[];
   liveData: LiveData;
+  onOrder?: (ids: string[]) => void;
 }
 
 type SortField = 'name' | 'os' | 'status' | 'cpu' | 'ram' | 'disk' | 'price' | 'networkUp' | 'networkDown' | 'totalUp' | 'totalDown';
@@ -37,7 +39,7 @@ interface SortState {
   order: SortOrder;
 }
 
-const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
+const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData, onOrder }) => {
   const [t] = useTranslation();
   const [sortState, setSortState] = useState<SortState>({ field: null, order: 'default' });
 
@@ -45,16 +47,11 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
     return (event: React.MouseEvent) => {
       event.preventDefault();
       
-      setSortState((prev) => {
-        if (prev.field === field) {
-          const nextOrder: SortOrder = 
-            prev.order === 'default' ? 'asc' : 
-            prev.order === 'asc' ? 'desc' : 'default';
-          return { field: nextOrder === 'default' ? null : field, order: nextOrder };
-        } else {
-          return { field, order: 'asc' };
-        }
-      });
+      if (!onOrder) return;
+      const nextOrder: SortOrder = sortState.field === field && sortState.order === 'asc' ? 'desc' : 'asc';
+      const next = { field, order: nextOrder };
+      setSortState(next);
+      onOrder(sortNodes(next).map(node => node.uuid));
     };
   };
 
@@ -79,7 +76,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
       : defaultLive;
   };
 
-  const sortedNodes = [...nodes].sort((a, b) => {
+  const sortNodes = (sortState: SortState) => [...nodes].sort((a, b) => {
     const aOnline = onlineNodes.includes(a.uuid);
     const bOnline = onlineNodes.includes(b.uuid);
     const aData = getNodeData(a.uuid);
@@ -141,7 +138,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
   const showPriceColumn = nodes.some(node => node.price !== 0);
 
   return (
-    <div className="node-table-shell">
+    <SortArea ids={nodes.map(n => n.uuid)} onOrder={onOrder}><div className="node-table-shell">
       <div className="node-table-headerbar" />
       <div className="overflow-x-auto node-table-container">
         <Table className="node-table-modern min-w-[1094px] table-fixed">
@@ -242,7 +239,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
             </TableRow>
           </TableHeader>
         <TableBody>
-          {sortedNodes.map((node) => {
+          {nodes.map((node) => {
             const isOnline = onlineNodes.includes(node.uuid);
             const nodeData = getNodeData(node.uuid);
             const memoryUsagePercent = node.mem_total
@@ -254,9 +251,9 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
 
             return (
               <React.Fragment key={node.uuid}>
-                <TableRow className={cn("ds-node-row", !isOnline && "opacity-70")}>
+                <SortItem row id={node.uuid} enabled={Boolean(onOrder)} className={cn("ds-node-row", !isOnline && "opacity-70")}>
                   <TableCell className="py-3 px-2">
-                    <div className="ds-node-name-wrap">
+                    <div className="ds-node-name-wrap"><SortHandle />
                       <span className={cn("ds-node-status-dot", isOnline ? "is-online" : "is-offline")} />
                       <Flag flag={node.region} />
                       <Link
@@ -348,14 +345,14 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
                       <span>↓ {formatBytes(nodeData.network.totalDown)}</span>
                     </div>
                   </TableCell>
-                </TableRow>
+                </SortItem>
               </React.Fragment>
             );
           })}
         </TableBody>
         </Table>
       </div>
-    </div>
+    </div></SortArea>
   );
 };
 
